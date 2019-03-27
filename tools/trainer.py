@@ -10,6 +10,7 @@ Author : https://github.com/pytorch/pytorch/blob/master/torch/utils/trainer/trai
 """
 import heapq
 import time
+from tqdm import tqdm
 
 import torch as t
 
@@ -21,14 +22,15 @@ class Trainer:
     """
     define a trainer class to train model
     """
-    def __init__(self, model, criterion, optimizer, dataset, val_dataset):
+    def __init__(self, model, criterion, optimizer, dataset, val_dataset, metric):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.dataset = dataset
+        self.val_dataset = val_dataset
         self.max_epoch = MAX_EPOCH
         self.batch_size = BATCH_SIZE
-        self.use_gpu = USE_GPU
+        self.model = model
         self.learning_rate = LEARNING_RATE
         self.iterations = 0
         self.stats = {}
@@ -39,8 +41,7 @@ class Trainer:
             'update': [],
         }
         self.loss = 0
-        self.f1 = 0
-        self.val_dataset = val_dataset
+        self.metric = metric
 
     def register_plugin(self, plugin):
         plugin.register(self)
@@ -72,23 +73,27 @@ class Trainer:
             heapq.heapify(q)
         current_time = time.strftime(TIME_FORMAT)
         for epoch in range(self.max_epoch):
-            print('epoch', epoch)
+            print('Epoch', epoch)
             self.step_one_epoch()
             self.call_plugins('epoch', epoch)
-            self.model.save()
-            log_content = 'Loss at epoch{epoch} is {loss}.\nAccuracy is {acc}'.format(
-                epoch=epoch,
-                loss=self.loss
-            )
-            print(log_content)
-            mylog(current_time, log_content)
+            if epoch % UPDATE_FREQ == 0:
+                self.model.save()
+                log_content = 'Loss at epoch {epoch} is {loss}.\n'.format(
+                    epoch=epoch,
+                    loss=self.loss,
+                )
+                log_content += evaluate(self.model, self.metric, self.val_dataset)
+                print(log_content)
+                mylog(current_time, log_content)
 
     def step_one_epoch(self):
         self.loss = 0
-        for iteration, data in enumerate(self.dataset, self.iterations):
+        for iteration, data in enumerate(tqdm(self.dataset)):
             batch_input, batch_label = data
+            batch_input = batch_input.to(DEVICE)
+            batch_label = batch_label.to(DEVICE)
             self.call_plugins('batch', iteration, batch_input, batch_label)
-            input_var = t.autograd.Variable(batch_input)
+            input_var = t.autograd.Variable(batch_input).float()
             label_var = t.autograd.Variable(batch_label).long()
             plugin_data = [None, None]
 

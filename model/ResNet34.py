@@ -7,8 +7,10 @@ File Description : Define my own ResNet34
 Author : llw
 """
 import torch as t
+from torch.nn import functional as F
 
 from model.BasicModel import BasicModel
+from config import DEVICE
 
 
 class BasicBlock(BasicModel):
@@ -39,7 +41,7 @@ class BasicBlock(BasicModel):
     def forward(self, x):
         residual = self.block_residual(x)
         shortcut = x if self.block_shortcut is None else self.block_shortcut(x)
-        return t.nn.functional.relu(residual + shortcut)
+        return F.relu(residual + shortcut)
 
 
 class ResNet34(BasicModel):
@@ -55,14 +57,13 @@ class ResNet34(BasicModel):
         self.pre_conv = t.nn.Sequential(
             t.nn.Conv2d(in_channels=self.in_channels, out_channels=64, kernel_size=7, stride=2, padding=3),
             t.nn.BatchNorm2d(64),
-            t.nn.ReLU(),
+            t.nn.ReLU(inplace=True),
             t.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        )
+        ).to(DEVICE)
         self.layer1 = self.make_layer(in_channels=64, out_channels=128, num_of_blocks=3)
         self.layer2 = self.make_layer(in_channels=128, out_channels=256, num_of_blocks=4, stride=2)
         self.layer3 = self.make_layer(in_channels=256, out_channels=512, num_of_blocks=6, stride=2)
         self.layer4 = self.make_layer(in_channels=512, out_channels=512, num_of_blocks=3, stride=2)
-        self.out_pooling = t.nn.AvgPool2d(kernel_size=7)
         self.out_fc = t.nn.Linear(512, self.out_classes)
 
     def make_layer(self, in_channels, out_channels, num_of_blocks, stride=1):
@@ -92,7 +93,7 @@ class ResNet34(BasicModel):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        x = self.out_pooling(x)
-        x = x.view(x.size()[0], -1)
+        x = F.avg_pool2d(x, 7)
+        x = x.view(x.size(0), -1)
         y = self.out_fc(x)
         return y

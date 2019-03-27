@@ -9,21 +9,31 @@ Author : Liangwei Li
 
 """
 import os
+import cv2
+from tqdm import  tqdm
 
 import torch as t
+import numpy as np
 
 from config import *
 
-def dense_to_one_hot(origin_tensor, num_of_classes):
+
+def show_image(image):
+    cv2.imshow("image", image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+def dense_to_one_hot(label, num_of_classes):
     """
     Convert a dense representation of one vector to one-hot representation
     :param origin_tensor:
     :param num_of_classes:
     :return:
     """
-    origin_tensor = origin_tensor.view(-1, 1)
-    origin_tensor = origin_tensor.long()
-    return t.zeros(origin_tensor.shape[0], num_of_classes).scatter(1, origin_tensor, 1).long()
+    res = t.zeros(num_of_classes, ).long()
+    res[label] = 1
+    return res
 
 
 def check_previous_models():
@@ -33,11 +43,11 @@ def check_previous_models():
     """
     available_models = os.listdir(CHECK_POINT_PATH)
     available_models.sort(key=lambda x: get_time_stamp(x))
-    if available_models :
+    while available_models:
         print('Do you want to keep and load previous models ?')
         key = input('Please type in k(keep) / d(delete): ')
         if key == 'k':
-            model_name = 'checkpoints/' + available_models[-1]
+            model_name = CHECK_POINT_PATH + available_models[-1]
             return model_name
         elif key == 'd':
             for model in available_models:
@@ -45,8 +55,6 @@ def check_previous_models():
             return None
         else:
             print('Please type k or d !')
-    else:
-        return None
 
 
 def mylog(file_name, log_content):
@@ -56,6 +64,8 @@ def mylog(file_name, log_content):
     :param log_content:  the content to be logged
     :return:
     """
+    if not os.path.exists(LOG_PATH):
+        os.mkdir(LOG_PATH)
     with open(LOG_PATH + file_name + '.log', 'a+') as file:
         file.write(log_content + '\n')
         file.close()
@@ -73,6 +83,24 @@ def get_time_stamp(str, time_format=TIME_FORMAT):
     import re
     timestr = re.findall('>_(.*)\.', str)[0]
     return time.mktime(datetime.datetime.strptime(timestr, time_format).timetuple())
+
+
+def evaluate(model, metric, eval_data):
+    model.eval()
+    print("Evaluating model...\n")
+    log_content = ""
+    res = 0
+    for data in tqdm(eval_data):
+        X, y = data
+        X = X.float().to(DEVICE)
+        y = y.long().to('cpu')
+        out = model(X)
+        out = t.argmax(out, dim=1).cpu()
+        res += metric(out, y)
+    res = res / len(eval_data)
+    log_content += "Average {metric_name} is {metric_value}.\n".format(metric_name=metric.__name__, metric_value=res)
+    model.train()
+    return log_content
 
 
 if __name__ == '__main__':
