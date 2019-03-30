@@ -11,13 +11,26 @@ from torchvision import transforms as TM
 from config import *
 from tools.tools import dense_to_one_hot
 
-my_transform = TM.Compose(
-    [
-        TM.Resize(HEIGHT),
-        TM.ToTensor(),
-        TM.Normalize(mean=[.5, .5, .5], std=[.5, .5, .5])
-    ]
-)
+
+def get_transformer():
+    if RESIZE:
+        return TM.Compose(
+            [
+                TM.Resize(HEIGHT),
+                TM.ToTensor(),
+                TM.Normalize(mean=[.5, .5, .5], std=[.5, .5, .5])
+            ]
+        )
+    else:
+        return TM.Compose(
+            [
+                TM.ToTensor(),
+                TM.Normalize(mean=[.5, .5, .5], std=[.5, .5, .5])
+            ]
+        )
+
+
+my_transform = get_transformer()
 
 
 def load_data(dataset, shuffle=True, drop_last=False):
@@ -37,14 +50,14 @@ class DataSet(DT.Dataset):
 
     def __init__(self, data_type="train", label=0, annotation_type=VINEGAR, transform=my_transform):
         self.data_type = data_type
-        self.label = LEVELS[label]
+        self.label = label
         self.annotation_type = annotation_type
         self.data_path = os.path.join(DATA_PATH, data_type)
         if annotation_type == VINEGAR:
             self.data_path = os.path.join(self.data_path, "vinegar")
         elif annotation_type == IODINE:
             self.data_path = os.path.join(self.data_path, "iodine")
-        self.data_path = os.path.join(self.data_path, str(label))
+        self.data_path = os.path.join(self.data_path, LEVEL_FOLDER[label])
         self.images_path = [os.path.join(self.data_path, image_path) for image_path in os.listdir(self.data_path)]
 
         if not transform:
@@ -79,5 +92,4 @@ if __name__ == '__main__':
     print(ds.size())
     ds = load_data([ds, ds])
     for idx, i in enumerate(ds):
-        print(i[1])
-
+        print(i[0].shape)

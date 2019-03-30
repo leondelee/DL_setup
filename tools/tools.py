@@ -43,6 +43,7 @@ def check_previous_models():
     """
     available_models = os.listdir(CHECK_POINT_PATH)
     available_models.sort(key=lambda x: get_time_stamp(x))
+    previous_logs = os.listdir(LOG_PATH)
     while available_models:
         print('Do you want to keep and load previous models ?')
         key = input('Please type in k(keep) / d(delete): ')
@@ -52,6 +53,8 @@ def check_previous_models():
         elif key == 'd':
             for model in available_models:
                 os.unlink(CHECK_POINT_PATH + model)
+            for log in previous_logs:
+                os.unlink(LOG_PATH + log)
             return None
         else:
             print('Please type k or d !')
@@ -103,8 +106,12 @@ def evaluate(model, metric, eval_data):
     return log_content
 
 
+def my_plot_from_log(key_words="loss"):
+    pass
+
+
 if __name__ == '__main__':
     import os
     av = os.listdir(CHECK_POINT_PATH)
     av.sort(key=lambda x: get_time_stamp(x))
-    print(av)
+    check_previous_models()
