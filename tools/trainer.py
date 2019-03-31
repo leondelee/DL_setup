@@ -5,17 +5,14 @@
 
 File Name : Trainer,py
 File Description : Define the Trainer class for model training
-Author : https://github.com/pytorch/pytorch/blob/master/torch/utils/trainer/trainer.py
+Author : llw
 
 """
 import heapq
 import time
-from tqdm import tqdm
 
-import torch as t
-
-from config import *
 from tools.tools import *
+from tensorboardX import SummaryWriter
 
 
 class Trainer:
@@ -42,6 +39,8 @@ class Trainer:
         }
         self.loss = 0
         self.metric = metric
+        self.current_time = time.strftime(TIME_FORMAT)
+        self.writer = SummaryWriter(os.path.join(TENSORBOARD_LOG_PATH, self.model.model_name))
 
     def register_plugin(self, plugin):
         plugin.register(self)
@@ -71,7 +70,7 @@ class Trainer:
         print('Start training...')
         for q in self.plugin_queues.values():
             heapq.heapify(q)
-        current_time = time.strftime(TIME_FORMAT)
+
         for epoch in range(self.max_epoch):
             print('Epoch', epoch)
             self.step_one_epoch()
@@ -79,13 +78,17 @@ class Trainer:
             if (epoch + 1) % UPDATE_FREQ == 0:
                 if MODEl_SAVE:
                     self.model.save()
-                log_content = 'Loss at epoch {epoch} is {loss}.\n'.format(
+                log_content = 'loss at epoch {epoch} is {loss}.\n'.format(
                     epoch=epoch,
                     loss=self.loss,
                 )
-                log_content += evaluate(self.model, self.metric, self.val_dataset)
+                val_score = evaluate(self.model, self.metric, self.val_dataset)
+                train_score = evaluate(self.model, self.metric, self.dataset)
+                log_content += val_score
+                log_content += "On training set:\n"
+                log_content += train_score
                 print(log_content)
-                mylog(current_time, log_content)
+                mylog(self.model.model_name, self.current_time, log_content)
 
     def step_one_epoch(self):
         self.loss = 0

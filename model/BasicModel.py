@@ -33,12 +33,12 @@ class BasicModel(nn.Module):
         :param name:
         :return:
         """
-        if not os.path.exists(CHECK_POINT_PATH):
-            os.mkdir(CHECK_POINT_PATH)
+        checkpoint_path = os.path.join(CHECK_POINT_PATH, self.model_name)
+        if not os.path.exists(checkpoint_path):
+            os.mkdir(checkpoint_path)
         if name is None:
-            prefix = CHECK_POINT_PATH + self.model_name + '_'
-            name = time.strftime(prefix + TIME_FORMAT + '.pth')
-        t.save(self.state_dict(), name)
+            name = time.strftime(TIME_FORMAT + '.pth')
+        t.save(self.state_dict(), os.path.join(checkpoint_path, name))
         return name
 
 

@@ -7,14 +7,15 @@ File Description : This is the file where we do the training, testing, validatin
 Author : Liangwei Li
 
 """
-import torch as t
+import torchvision as tv
 from sklearn.metrics import accuracy_score, f1_score
 
 from tools.trainer import Trainer
-from model.ResNet34 import ResNet34
+from tools.tools import check_previous_models
+from model.transfer_model import TransferModel
 from data.data_loader import *
 from config import *
-from tools.tools import check_previous_models, evaluate
+
 
 
 def train(trainer):
@@ -24,16 +25,19 @@ def train(trainer):
 if __name__ == '__main__':
     # define model
     # model = ResNet34(in_channels=NUM_CHANNELS, out_classes=NUM_CLASSES).to(DEVICE)
+    # model = resnet18(pretrained=False).to(DEVICE)
     from torchvision.models import resnet18
-    model = resnet18(pretrained=True).to(DEVICE)
+    model = TransferModel(resnet18, pretrained=True, pre_out=1000)
+    model = model.to(DEVICE)
     if MODEl_SAVE:
-        model_flag = check_previous_models()                       # check if there exist previous models
+        model_flag = check_previous_models(model.model_name)                       # check if there exist previous models
         if model_flag != None:
             model.load(model_flag)
     else:
-        previous_logs = os.listdir(LOG_PATH)
+        log_path = os.path.join(LOG_PATH, model.model_name)
+        previous_logs = os.listdir(log_path)
         for log in previous_logs:
-            os.unlink(LOG_PATH + log)
+            os.unlink(log_path + log)
 
     # load_data
     type_name = ["vinegar"]
@@ -50,7 +54,14 @@ if __name__ == '__main__':
     test_data = load_data([d for d in [name_data for name_data in test_dic[name] for name in type_name]])
 
     # define training details
-    criterion = t.nn.CrossEntropyLoss()
+    # balanced_weight = t.zeros(NUM_CLASSES, ).to(DEVICE)
+    # balanced_weight[0] = 0.5
+    # balanced_weight[1] = 0.5
+    # balanced_weight[2] = 1
+    # balanced_weight[3] = 2
+    # balanced_weight = balanced_weight.to(DEVICE)
+    balanced_weight = None
+    criterion = t.nn.CrossEntropyLoss(weight=balanced_weight)
     optimizer = t.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     trainer = Trainer(
         model=model,

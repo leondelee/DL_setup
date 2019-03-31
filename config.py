@@ -12,6 +12,10 @@ MODEL_PATH = os.path.join(ROOT_PATH, "model/")
 TOOLS_PATH = os.path.join(ROOT_PATH, "tools/")
 CHECK_POINT_PATH = os.path.join(ROOT_PATH, "checkpoints/")
 LOG_PATH = os.path.join(ROOT_PATH, "log/")
+TENSORBOARD_LOG_PATH = os.path.join(ROOT_PATH, "runs/")
+for pth in [ROOT_PATH, DATA_PATH, MODEL_PATH, TOOLS_PATH, CHECK_POINT_PATH, LOG_PATH]:
+    if not os.path.exists(pth):
+        os.mkdir(pth)
 
 # device
 DEVICE = 'cuda'
@@ -20,7 +24,7 @@ DEVICE = 'cuda'
 VINEGAR = 0
 IODINE = 1
 NUM_CHANNELS = 3
-NUM_CLASSES = 2
+NUM_CLASSES = 3
 RESIZE = False
 HEIGHT = 224
 WIDTH = 224
@@ -32,18 +36,18 @@ WIDTH = 224
 """
 LEVELS = [l for l in range(NUM_CLASSES)]
 LEVEL_FOLDER = os.listdir(os.path.join(DATA_PATH, "train/vinegar"))
+LEVEL_FOLDER.sort()
 
 # Training Details
 BATCH_SIZE = 4
 LOAD_DATA_WORKERS = 4
 TIME_FORMAT = "%m_%d_%H:%M:%S"
 MAX_EPOCH = 500
-USE_GPU = True
-LEARNING_RATE = 1e-4
-WEIGHT_DECAY = 0.99
+LEARNING_RATE = 1e-6
+WEIGHT_DECAY = 0.9
 UPDATE_FREQ = 10
-MODEl_SAVE = False
+MODEl_SAVE = True
 
 
 if __name__ == '__main__':
-    print(os.path.dirname(os.path.realpath(__file__)))
+    print(LEVEL_FOLDER)

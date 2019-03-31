@@ -9,7 +9,7 @@ from torchvision import transforms as TM
 
 # TODO :from tools.image_preprocess import transform
 from config import *
-from tools.tools import dense_to_one_hot
+from tools.tools import show_image
 
 
 def get_transformer():
@@ -49,6 +49,7 @@ def load_data(dataset, shuffle=True, drop_last=False):
 class DataSet(DT.Dataset):
 
     def __init__(self, data_type="train", label=0, annotation_type=VINEGAR, transform=my_transform):
+        super(DataSet, self).__init__()
         self.data_type = data_type
         self.label = label
         self.annotation_type = annotation_type
