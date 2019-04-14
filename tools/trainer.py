@@ -11,17 +11,19 @@ Author : llw
 import heapq
 import time
 
+import torch as t
+
 from tools.tools import *
-from tensorboardX import SummaryWriter
 
 
 class Trainer:
     """
     define a trainer class to train model
     """
-    def __init__(self, model, criterion, optimizer, dataset, val_dataset, metric):
+    def __init__(self, model, criterion, scheduler, optimizer, dataset, val_dataset, metric):
         self.model = model
         self.criterion = criterion
+        self.scheduler = scheduler
         self.optimizer = optimizer
         self.dataset = dataset
         self.val_dataset = val_dataset
@@ -40,7 +42,7 @@ class Trainer:
         self.loss = 0
         self.metric = metric
         self.current_time = time.strftime(TIME_FORMAT)
-        self.writer = SummaryWriter(os.path.join(TENSORBOARD_LOG_PATH, self.model.model_name))
+        self.last_high = 0
 
     def register_plugin(self, plugin):
         plugin.register(self)
@@ -73,22 +75,32 @@ class Trainer:
 
         for epoch in range(self.max_epoch):
             print('Epoch', epoch)
+            self.scheduler.step()
             self.step_one_epoch()
             self.call_plugins('epoch', epoch)
             if (epoch + 1) % UPDATE_FREQ == 0:
-                if MODEl_SAVE:
-                    self.model.save()
                 log_content = 'loss at epoch {epoch} is {loss}.\n'.format(
                     epoch=epoch,
                     loss=self.loss,
                 )
-                val_score = evaluate(self.model, self.metric, self.val_dataset)
-                train_score = evaluate(self.model, self.metric, self.dataset)
-                log_content += val_score
+                val_log, val_score = evaluate(self.model, self.metric, self.val_dataset)
+                train_log, train_score = evaluate(self.model, self.metric, self.dataset)
+                if val_score > self.last_high:
+                    if MODEl_SAVE:
+                        self.model.save()
+                    self.last_high = val_score
                 log_content += "On training set:\n"
-                log_content += train_score
+                log_content += train_log
+                log_content += "On validation set:\n"
+                log_content += val_log
                 print(log_content)
                 mylog(self.model.model_name, self.current_time, log_content)
+        log_content = "Training finished!\nHighest {name} is {value}.".format(
+            name=self.metric.__name__,
+            value=self.last_high
+        )
+        mylog(self.model.model_name, self.current_time, log_content)
+        print(log_content)
 
     def step_one_epoch(self):
         self.loss = 0
@@ -100,10 +112,12 @@ class Trainer:
             input_var = t.autograd.Variable(batch_input).float()
             label_var = t.autograd.Variable(batch_label).long()
             plugin_data = [None, None]
-
             def closure():
-                output_var = self.model(input_var).float()
-                self.loss = self.criterion(output_var, label_var)
+                output_var = self.model(input_var)
+                if len(output_var) > 0:
+                    output_var = output_var[0]
+                output_var = output_var.float()
+                self.loss = self.criterion(output_var.view(-1, NUM_CLASSES), label_var.view(-1, 1)[:, 0])
                 self.loss.backward()
                 if plugin_data[0] is None:
                     plugin_data[0] = output_var.data

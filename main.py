@@ -63,12 +63,14 @@ if __name__ == '__main__':
     balanced_weight = None
     criterion = t.nn.CrossEntropyLoss(weight=balanced_weight)
     optimizer = t.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    scheduler = t.optim.lr_scheduler.StepLR(optimizer, step_size=SCHEDULER_STEP, gamma=GAMMA)
     trainer = Trainer(
         model=model,
         criterion=criterion,
+        scheduler=scheduler,
         optimizer=optimizer,
         dataset=train_data,
-        val_dataset=val_data,
+        val_dataset=test_data,
         metric=accuracy_score
     )
 

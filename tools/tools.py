@@ -9,16 +9,17 @@ Author : Liangwei Li
 
 """
 import cv2
+import torch as t
 from tqdm import  tqdm
 import matplotlib.pyplot as plt
+import pptk
 
 from config import *
 
 
-def show_image(image):
-    cv2.imshow("image", image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+def show_point_clouds(pts, lbs):
+    v = pptk.viewer(pts)
+    v.attributes(lbs)
 
 
 def rotate_image(image, degre, center=None, scale=1):
@@ -52,8 +53,6 @@ def check_previous_models(model_name):
         os.mkdir(checkpoint_path)
     available_models = os.listdir(checkpoint_path)
     available_models.sort(key=lambda x: get_time_stamp(x))
-    tensor_logger_path = os.path.join(TENSORBOARD_LOG_PATH, model_name)
-    tensor_loggers = os.listdir(tensor_logger_path)
     log_path = os.path.join(LOG_PATH, model_name)
     previous_logs = os.listdir(log_path)
     while available_models:
@@ -66,10 +65,8 @@ def check_previous_models(model_name):
         elif key == 'd':
             for model in available_models:
                 os.unlink(os.path.join(checkpoint_path, model))
-            for logger in tensor_loggers:
-                os.unlink(os.path.join(tensor_logger_path, logger))
             for log in previous_logs:
-                os.unlink(log_path + log)
+                os.unlink(os.path.join(log_path, log))
             return None
         else:
             print('Please type k or d !')
@@ -84,8 +81,6 @@ def mylog(model_name, time, log_content):
     """
     if not os.path.exists(LOG_PATH):
         os.mkdir(LOG_PATH)
-    if not os.path.exists(os.path.join(LOG_PATH, model_name)):
-        os.mkdir(os.path.join(LOG_PATH, model_name))
     with open(LOG_PATH + "/" + model_name + "/" + time + '.log', 'a+') as file:
         file.write(log_content + '\n')
         file.close()
@@ -132,13 +127,15 @@ def evaluate(model, metric, eval_data):
         X = X.float().to(DEVICE)
         y = y.long().to('cpu')
         out = model(X)
-        out = t.argmax(out, dim=1).cpu()
+        if len(out) > 1:
+            out = out[0]
+        out = t.argmax(out, dim=2).cpu()
         # print("out: {}, y: {}".format(out, y))
-        res += metric(out, y)
+        res += metric(out.view(-1, 1), y.view(-1, 1))
     res = res / len(eval_data)
     log_content += "average {metric_name} is {metric_value}.\n".format(metric_name=metric.__name__, metric_value=res)
     model.train()
-    return log_content
+    return log_content, res
 
 
 if __name__ == '__main__':
