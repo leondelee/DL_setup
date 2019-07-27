@@ -34,7 +34,7 @@ my_transform = get_transformer()
 
 
 def load_data(dataset, shuffle=True, drop_last=False):
-    if len(dataset) > 1:
+    if type(dataset) == list:
         dataset = DT.ConcatDataset(dataset)
     data_loader = DT.DataLoader(
         dataset=dataset,

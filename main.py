@@ -1,79 +1,90 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
+import argparse
 
-File Name : main.py
-File Description : This is the file where we do the training, testing, validating job
-Author : Liangwei Li
+import torch
+import torch.utils.data as DT
+from sklearn.metrics import accuracy_score
 
-"""
-import torchvision as tv
-from sklearn.metrics import accuracy_score, f1_score
-
-from tools.trainer import Trainer
-from tools.tools import check_previous_models
-from model.transfer_model import TransferModel
-from data.data_loader import *
-from config import *
+from utils.trainer import Trainer
+from utils.tools import *
+from data.data_loader import ObjectsDataset as DataSet
+from model.smoothnet3d import SmoothNet3D as Model
+from model.smoothnet3d import DescLoss as Loss
+from model.smoothnet3d import DescMetric as Metric
 
 
+def arg_parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--name',
+        type=str,
+        default='demo'
+    )
+    args = parser.parse_args()
+    cfg = get_cfg(args.name)
+    return cfg
 
-def train(trainer):
+
+def train(config):
+    trainer = Trainer(config)
     trainer.run()
 
 
 if __name__ == '__main__':
-    # define model
-    # model = ResNet34(in_channels=NUM_CHANNELS, out_classes=NUM_CLASSES).to(DEVICE)
-    # model = resnet18(pretrained=False).to(DEVICE)
-    from torchvision.models import resnet18
-    model = TransferModel(resnet18, pretrained=True, pre_out=1000)
-    model = model.to(DEVICE)
-    if MODEl_SAVE:
-        model_flag = check_previous_models(model.model_name)                       # check if there exist previous models
-        if model_flag != None:
-            model.load(model_flag)
-    else:
-        log_path = os.path.join(LOG_PATH, model.model_name)
-        previous_logs = os.listdir(log_path)
-        for log in previous_logs:
-            os.unlink(log_path + log)
+    cfg = arg_parse()
+    t.cuda.set_device(cfg["gpu"])
+    assert t.cuda.current_device() == int(cfg["gpu"])
 
-    # load_data
-    type_name = ["vinegar"]
-    train_dic = {}
-    val_dic = {}
-    test_dic = {}
-    for idx, name in enumerate(type_name):
-        train_dic[name] = [DataSet(data_type="train", label=k, annotation_type=idx) for k in range(NUM_CLASSES)]
-        val_dic[name] = [DataSet(data_type="validation", label=k, annotation_type=idx) for k in range(NUM_CLASSES)]
-        test_dic[name] = [DataSet(data_type="test", label=k, annotation_type=idx) for k in range(NUM_CLASSES)]
+    # checkpoint = get_checkpoints(cfg)
+    checkpoint = None
+    # model = GraphGlobal(cfg).cuda()
+    model = Model(cfg).cuda()
+    if checkpoint:
+        model.load_state_dict(t.load(checkpoint))
 
-    train_data = load_data([d for d in [name_data for name_data in train_dic[name] for name in type_name]])
-    val_data = load_data([d for d in [name_data for name_data in val_dic[name] for name in type_name]])
-    test_data = load_data([d for d in [name_data for name_data in test_dic[name] for name in type_name]])
+    if cfg["mode"] == "debug":
+        clean_logs_and_checkpoints(cfg)
 
-    # define training details
-    # balanced_weight = t.zeros(NUM_CLASSES, ).to(DEVICE)
-    # balanced_weight[0] = 0.5
-    # balanced_weight[1] = 0.5
-    # balanced_weight[2] = 1
-    # balanced_weight[3] = 2
-    # balanced_weight = balanced_weight.to(DEVICE)
-    balanced_weight = None
-    criterion = t.nn.CrossEntropyLoss(weight=balanced_weight)
-    optimizer = t.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    scheduler = t.optim.lr_scheduler.StepLR(optimizer, step_size=SCHEDULER_STEP, gamma=GAMMA)
-    trainer = Trainer(
-        model=model,
-        criterion=criterion,
-        scheduler=scheduler,
-        optimizer=optimizer,
-        dataset=train_data,
-        val_dataset=test_data,
-        metric=accuracy_score
+    logger = get_logger(cfg)
+    log_content = "\nUsing Configuration:\n{\n"
+    for key in cfg:
+        log_content += "    {}: {}\n".format(key, cfg[key])
+    logger.info(log_content + '}')
+
+    criterion = Loss()
+    metric = Metric()
+    # criterion = t.nn.NLLLoss()
+
+    optimizer = t.optim.Adam(
+        params=model.parameters(),
+        lr=cfg["lr"],
+        weight_decay=cfg["weight_decay"],
     )
 
-    train(trainer)
-    # evaluate(model=model, metric=accuracy_score, eval_data=val_data)
-    # evaluate(model, test_data)
+    train_data = DT.DataLoader(
+        dataset=DataSet(cfg, True),
+        batch_size=cfg["batch_size"],
+        shuffle=True
+    )
+
+    test_data = DT.DataLoader(
+        dataset=DataSet(cfg, False),
+        batch_size=cfg["batch_size"],
+        shuffle=True
+    )
+    cfg['trainer_config'] = dict(
+        model=model,
+        criterion=criterion,
+        metric=metric,
+        logger=logger,
+        scheduler=optimizer,
+        train_data=train_data,
+        test_data=test_data
+    )
+
+    train(cfg)
+
+    # evaluate(model, metric, test_data)
+
+
+
+
